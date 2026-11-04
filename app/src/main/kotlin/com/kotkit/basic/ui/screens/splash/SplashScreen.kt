@@ -1,10 +1,5 @@
 package com.kotkit.basic.ui.screens.splash
 
-import android.net.Uri
-import timber.log.Timber
-import android.view.ViewGroup.LayoutParams.MATCH_PARENT
-import android.widget.FrameLayout
-import androidx.annotation.OptIn
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -15,26 +10,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
-import com.kotkit.basic.R
 import com.kotkit.basic.ui.theme.AeonikFontFamily
 import com.kotkit.basic.ui.theme.GradientCyan
 import com.kotkit.basic.ui.theme.GradientPink
@@ -42,38 +25,30 @@ import com.kotkit.basic.ui.theme.TikTokBlack
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 
-@OptIn(UnstableApi::class)
 @Composable
 fun SplashScreen(
     onSplashFinished: () -> Unit
 ) {
-    val context = LocalContext.current
-
     // Animation states
-    var showVideo by remember { mutableStateOf(false) }
     var showTitle by remember { mutableStateOf(false) }
     var glitchActive by remember { mutableStateOf(false) }
     var fadeOut by remember { mutableStateOf(false) }
 
-    // Glitch intensity (10 = max chaos, 0 = calm)
+    // Glitch intensity
     var glitchStep by remember { mutableIntStateOf(0) }
 
-    // Glitch animation values - only slices (no shake that reveals video bounds)
-    var glitchSlices by remember { mutableStateOf(listOf<GlitchSlice>()) }
-
-    // Video fade in - overlay fades OUT to reveal video
-    val overlayAlpha by animateFloatAsState(
-        targetValue = if (showVideo) 0f else 1f,
-        animationSpec = tween(1500, easing = LinearOutSlowInEasing),
-        label = "overlayAlpha"
-    )
+    // Glitch slices
+    var glitchSlices by remember {
+        mutableStateOf(listOf<GlitchSlice>())
+    }
 
     // Title animation
     val titleAlpha by animateFloatAsState(
         targetValue = if (showTitle && !glitchActive && !fadeOut) 1f else 0f,
         animationSpec = tween(
             durationMillis = if (glitchActive || fadeOut) 100 else 800,
-            easing = if (glitchActive || fadeOut) LinearEasing else LinearOutSlowInEasing
+            easing = if (glitchActive || fadeOut) LinearEasing
+            else LinearOutSlowInEasing
         ),
         label = "titleAlpha"
     )
@@ -81,7 +56,7 @@ fun SplashScreen(
     val titleScale by animateFloatAsState(
         targetValue = if (showTitle && !glitchActive) 1f else 0.3f,
         animationSpec = spring(
-            dampingRatio = 0.5f, // More bounce
+            dampingRatio = 0.5f,
             stiffness = Spring.StiffnessMedium
         ),
         label = "titleScale"
@@ -95,6 +70,7 @@ fun SplashScreen(
 
     // Glow pulsation
     val infiniteTransition = rememberInfiniteTransition(label = "glow")
+
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.3f,
         targetValue = 0.6f,
@@ -109,21 +85,33 @@ fun SplashScreen(
     val screenAlpha by animateFloatAsState(
         targetValue = if (fadeOut) 0f else 1f,
         animationSpec = tween(250, easing = LinearEasing),
-        finishedListener = { if (fadeOut) onSplashFinished() },
+        finishedListener = {
+            if (fadeOut) onSplashFinished()
+        },
         label = "screenAlpha"
     )
 
-    // Glitch animation loop - ONLY SLICES (no shake/RGB that reveals video bounds)
+    // Splash timeline: title first, then glitch
+    LaunchedEffect(Unit) {
+        delay(1800)
+        showTitle = true
+
+        delay(2500)
+        glitchActive = true
+    }
+
+    // Glitch animation loop
     LaunchedEffect(glitchActive) {
         if (glitchActive) {
-            // Quick glitch ~400ms - only horizontal slices
             for (step in 8 downTo 0) {
                 glitchStep = step
                 val intensity = step / 8f
 
                 repeat(2) {
-                    // Only color slices - cyan/pink/white
-                    val sliceCount = (Random.nextInt(4, 10) * intensity).toInt().coerceAtLeast(2)
+                    val sliceCount = (
+                        Random.nextInt(4, 10) * intensity
+                    ).toInt().coerceAtLeast(2)
+
                     glitchSlices = if (Random.nextFloat() < 0.8f) {
                         List(sliceCount) {
                             GlitchSlice(
@@ -138,55 +126,17 @@ fun SplashScreen(
                                 alpha = Random.nextFloat() * 0.6f + 0.2f
                             )
                         }
-                    } else emptyList()
+                    } else {
+                        emptyList()
+                    }
 
                     delay(30L)
                 }
             }
 
-            // Quick reset and fade
             glitchSlices = emptyList()
             fadeOut = true
         }
-    }
-
-    // ExoPlayer setup
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            val videoUri = Uri.parse("android.resource://${context.packageName}/${R.raw.splash_video}")
-            setMediaItem(MediaItem.fromUri(videoUri))
-            repeatMode = Player.REPEAT_MODE_OFF
-            playWhenReady = true
-            prepare()
-        }
-    }
-
-    // Listen for video playback events
-    DisposableEffect(exoPlayer) {
-        val listener = object : Player.Listener {
-            override fun onRenderedFirstFrame() {
-                // First frame is rendered - start fade-in
-                showVideo = true
-            }
-
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED) {
-                    glitchActive = true
-                }
-            }
-        }
-        exoPlayer.addListener(listener)
-
-        onDispose {
-            exoPlayer.removeListener(listener)
-            exoPlayer.release()
-        }
-    }
-
-    // Show title after delay
-    LaunchedEffect(Unit) {
-        delay(1800)
-        showTitle = true
     }
 
     Box(
@@ -196,7 +146,7 @@ fun SplashScreen(
             .alpha(screenAlpha),
         contentAlignment = Alignment.Center
     ) {
-        // Glow effect behind video
+        // Glow effect
         Box(
             modifier = Modifier
                 .size(400.dp)
@@ -212,46 +162,22 @@ fun SplashScreen(
                 )
         )
 
-        // Video player
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f),
-            contentAlignment = Alignment.Center
-        ) {
-            AndroidView(
-                factory = { ctx ->
-                    PlayerView(ctx).apply {
-                        player = exoPlayer
-                        useController = false
-                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                        layoutParams = FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
-                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-
-            // Black overlay that fades out to reveal video
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .alpha(overlayAlpha)
-                    .background(TikTokBlack)
-            )
-        }
-
-        // Glitch slices overlay - full screen
+        // Glitch slices overlay
         if (glitchActive && glitchSlices.isNotEmpty()) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 glitchSlices.forEach { slice ->
-                    // Main slice
                     drawRect(
                         color = slice.color.copy(alpha = slice.alpha),
-                        topLeft = Offset(slice.xShift.dp.toPx(), size.height * slice.yOffset),
-                        size = Size(size.width + 100f, size.height * slice.height)
+                        topLeft = Offset(
+                            slice.xShift.dp.toPx(),
+                            size.height * slice.yOffset
+                        ),
+                        size = Size(
+                            size.width + 100f,
+                            size.height * slice.height
+                        )
                     )
-                    // Secondary offset slice for depth
+
                     if (Random.nextFloat() > 0.5f) {
                         drawRect(
                             color = slice.color.copy(alpha = slice.alpha * 0.5f),
@@ -259,14 +185,17 @@ fun SplashScreen(
                                 -slice.xShift.dp.toPx() * 0.5f,
                                 size.height * slice.yOffset + 5.dp.toPx()
                             ),
-                            size = Size(size.width, size.height * slice.height * 0.5f)
+                            size = Size(
+                                size.width,
+                                size.height * slice.height * 0.5f
+                            )
                         )
                     }
                 }
             }
         }
 
-        // Scanlines overlay during glitch (subtle)
+        // Scanlines overlay
         if (glitchActive && glitchStep > 3) {
             Canvas(
                 modifier = Modifier
@@ -276,6 +205,7 @@ fun SplashScreen(
                 val lineHeight = 1.dp.toPx()
                 val gap = 4.dp.toPx()
                 var y = 0f
+
                 while (y < size.height) {
                     drawRect(
                         color = Color.Black,
@@ -287,7 +217,7 @@ fun SplashScreen(
             }
         }
 
-        // App title at bottom
+        // App title
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -295,7 +225,6 @@ fun SplashScreen(
             verticalArrangement = Arrangement.Bottom,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Gradient text "KotKit"
             Text(
                 text = "KotKit",
                 fontSize = 42.sp,
@@ -312,7 +241,6 @@ fun SplashScreen(
                     .offset(y = titleOffsetY.dp)
             )
 
-            // Subtle tagline
             Text(
                 text = "Smart TikTok Autoposter",
                 fontSize = 14.sp,
