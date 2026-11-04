@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "247578684145",
+    "project_id": "gamebotai",
+    "storage_bucket": "gamebotai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:247578684145:android:b6bad17b1c8d9153ad5750",
+        "android_client_info": {
+          "package_name": "com.aistudio.gameai.botplay"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqsZhBz6frtc3hIzriNwVa8_V4LIncZDA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:247578684145:android:eb47a6e3aa5d881bad5750",
+        "android_client_info": {
+          "package_name": "com.kotkit.basic"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqsZhBz6frtc3hIzriNwVa8_V4LIncZDA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
