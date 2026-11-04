@@ -1,5 +1,5 @@
 # KotKit Basic
-jos jos jos jis 
+jos jos jos jis tiktok jos jis 
 
 **AI-powered Android client for automated TikTok video posting.**
 
