@@ -1,10 +1,11 @@
-name: Build KotKit APK
+
+name: Build APK
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
   workflow_dispatch:
 
 permissions:
@@ -13,100 +14,49 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup JDK 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
           java-version: '17'
+          distribution: temurin
           cache: gradle
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: false
+          packages: ''
 
       - name: Accept Android SDK Licenses
-        run: yes | sdkmanager --licenses
-
-      - name: Install Required SDK and NDK
         run: |
-          sdkmanager --install \
-            "platform-tools" \
-            "platforms;android-34" \
-            "build-tools;34.0.0" \
-            "ndk;27.2.12479018"
+          for i in {1..100}; do echo y; done | sdkmanager --licenses
 
-      - name: Configure Firebase
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+      - name: Install Android SDK Components
         run: |
-          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
-            printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
-          elif [ ! -f app/google-services.json ]; then
-            cat > app/google-services.json <<'EOF'
-          {
-            "project_info": {
-              "project_number": "123456789000",
-              "project_id": "kotkit-ci-placeholder",
-              "storage_bucket": "kotkit-ci-placeholder.appspot.com"
-            },
-            "client": [{
-              "client_info": {
-                "mobilesdk_app_id": "1:123456789000:android:0000000000000000",
-                "android_client_info": {
-                  "package_name": "com.kotkit.basic"
-                }
-              },
-              "api_key": [{
-                "current_key": "CI_PLACEHOLDER_API_KEY"
-              }],
-              "services": {}
-            }],
-            "configuration_version": "1"
-          }
-          EOF
-            echo "WARNING: Using placeholder Firebase configuration."
-          fi
+          sdkmanager --install "platform-tools"
+          sdkmanager --install "platforms;android-34"
+          sdkmanager --install "build-tools;34.0.0"
+          sdkmanager --install "ndk;27.2.12479018"
 
-      - name: Grant Gradle Permission
+      - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Check Environment
-        run: |
-          java -version
-          ./gradlew --version
+      - name: Check Gradle
+        run: ./gradlew --version
 
       - name: Build Debug APK
-        run: |
-          ./gradlew :app:assembleDebug \
-            --no-daemon \
-            --stacktrace
-
-      - name: Verify APK
-        run: |
-          test -f app/build/outputs/apk/debug/app-debug.apk
-          ls -lh app/build/outputs/apk/debug/*.apk
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: KotKit-Android-APK
+          name: kotkit-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
-
-      - name: Upload Error Reports
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: KotKit-Build-Errors
-          path: |
-            **/build/reports/
-            **/build/outputs/logs/
-          if-no-files-found: ignore
-          retention-days: 7
           
